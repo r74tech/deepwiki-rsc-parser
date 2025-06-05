@@ -1,4 +1,7 @@
-import { assertEquals, assertExists } from "https://deno.land/std@0.208.0/assert/mod.ts";
+import {
+  assertEquals,
+  assertExists,
+} from "https://deno.land/std@0.208.0/assert/mod.ts";
 import { DeepWikiRSCParser } from "./parser.ts";
 
 Deno.test("DeepWikiRSCParser - parse basic T-type entries", () => {
@@ -26,8 +29,14 @@ Plugin content.`;
   const result = parser.parse(rscContent);
 
   assertEquals(result.allMarkdown.length, 3);
-  assertEquals(result.allMarkdown[0], "# Introduction\nThis is the introduction.\nSources: [file.md]()");
-  assertEquals(result.allMarkdown[1], "# Core Architecture\nCore content here.");
+  assertEquals(
+    result.allMarkdown[0],
+    "# Introduction\nThis is the introduction.\nSources: [file.md]()",
+  );
+  assertEquals(
+    result.allMarkdown[1],
+    "# Core Architecture\nCore content here.",
+  );
   assertEquals(result.allMarkdown[2], "# Plugin System\nPlugin content.");
 });
 

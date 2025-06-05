@@ -6,8 +6,8 @@ import {
   DeepWikiRSCParser,
   type PageInfo,
   type ParseResult,
-  type WikiMetadata,
 } from "./parser.ts";
+import { addGitHubLinks } from "./utils.ts";
 
 export interface FetchOptions {
   headers?: Record<string, string>;
@@ -179,7 +179,7 @@ export class DeepWikiClient {
     if (this.parser.metadata && result.pages) {
       return result.pages.map((page) => ({
         ...page,
-        content: this.addGitHubLinksToContent(
+        content: addGitHubLinks(
           page.content,
           this.parser.metadata || {
             repo_name: org,
@@ -208,41 +208,5 @@ export class DeepWikiClient {
     );
 
     return parser.getAllMarkdownCombined();
-  }
-
-  /**
-   * Add GitHub links to markdown content
-   */
-  private addGitHubLinksToContent(
-    content: string,
-    metadata: WikiMetadata,
-  ): string {
-    const { repo_name, commit_hash } = metadata;
-    const baseUrl = `https://github.com/${repo_name}/blob/${commit_hash}`;
-
-    // Replace file references like [Makefile](Makefile) with GitHub links
-    let processed = content.replace(
-      /\[([^\]]+)\]\((?!https?:\/\/)([^)]+)\)/g,
-      (match, text, path) => {
-        // Skip if it's already a full URL or an anchor link
-        if (path.startsWith("#") || path.startsWith("http")) {
-          return match;
-        }
-        return `[${text}](${baseUrl}/${path})`;
-      },
-    );
-
-    // Replace source references like Sources: [file.py:10-20]()
-    processed = processed.replace(
-      /Sources:\s*\[([^\]]+):(\d+)(?:-(\d+))?\]\(\)/g,
-      (_match, file, startLine, endLine) => {
-        const lineRef = endLine ? `L${startLine}-L${endLine}` : `L${startLine}`;
-        return `Sources: [${file}:${startLine}${
-          endLine ? `-${endLine}` : ""
-        }](${baseUrl}/${file}#${lineRef})`;
-      },
-    );
-
-    return processed;
   }
 }

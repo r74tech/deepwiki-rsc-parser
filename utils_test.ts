@@ -1,9 +1,9 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import {
-  parseRSCResponse,
+  convertToMarkdownDocument,
   extractMarkdown,
   getPageContent,
-  convertToMarkdownDocument
+  parseRSCResponse,
 } from "./utils.ts";
 import type { ParseResult } from "./parser.ts";
 
@@ -41,7 +41,11 @@ Deno.test("utils - convertToMarkdownDocument", () => {
   const result: ParseResult = {
     pages: [
       { id: "1", title: "Introduction", content: "# Intro\nWelcome!" },
-      { id: "1.1", title: "Getting Started", content: "# Getting Started\nLet's begin." },
+      {
+        id: "1.1",
+        title: "Getting Started",
+        content: "# Getting Started\nLet's begin.",
+      },
     ],
     markdownById: {},
     allMarkdown: [],

@@ -14,7 +14,13 @@
  */
 
 import { DeepWikiClient } from "./mod.ts";
-import { convertToMarkdownDocument } from "./utils.ts";
+import {
+  addGitHubLinks,
+  convertToMarkdownDocument,
+  formatMetadataForConsole,
+  formatPageForDisplay,
+  generateOutputFilename,
+} from "./utils.ts";
 import type { ParseResult, WikiMetadata } from "./parser.ts";
 
 function printHelp() {
@@ -129,14 +135,7 @@ async function main() {
         }
 
         for (const page of result.pages) {
-          const filename = `${page.id}-${
-            page.title
-              .toLowerCase()
-              .replace(/\s+/g, "-")
-              .replace(/[^a-zA-Z0-9-]/g, "-")
-              .replace(/-+/g, "-")
-              .replace(/^-|-$/g, "")
-          }.md`;
+          const filename = generateOutputFilename(page);
           const filepath = `${options.output}/${filename}`;
 
           // Add GitHub links to content if metadata is available
@@ -152,73 +151,23 @@ async function main() {
     } else {
       // Display to console
       if (metadata) {
-        console.log("\nMetadata:");
-        console.log(`- Repository: ${metadata.repo_name}`);
-        console.log(`- Commit: ${metadata.commit_hash}`);
-        console.log(`- Generated: ${metadata.generated_at}`);
+        console.log(formatMetadataForConsole(metadata));
       }
 
       console.log(`\nFound ${result.pages.length} pages:\n`);
 
       for (const page of result.pages) {
-        console.log(`${"=".repeat(60)}`);
-        console.log(`${page.id}: ${page.title}`);
-        console.log(`${"=".repeat(60)}`);
-        console.log(page.content);
+        console.log(formatPageForDisplay(page));
         console.log("\n");
       }
     }
   } catch (error) {
-    console.error("Error:", error instanceof Error ? error.message : String(error));
+    console.error(
+      "Error:",
+      error instanceof Error ? error.message : String(error),
+    );
     Deno.exit(1);
   }
-}
-
-/**
- * Add GitHub links to markdown content
- */
-function addGitHubLinks(content: string, metadata: WikiMetadata): string {
-  const { repo_name, commit_hash } = metadata;
-  const baseUrl = `https://github.com/${repo_name}/blob/${commit_hash}`;
-
-  // Replace file references like [Makefile](Makefile) with GitHub links
-  let processed = content.replace(
-    /\[([^\]]+)\]\((?!https?:\/\/)([^)]+)\)/g,
-    (match, text, path) => {
-      // Skip if it's already a full URL or an anchor link
-      if (path.startsWith("#") || path.startsWith("http")) {
-        return match;
-      }
-      return `[${text}](${baseUrl}/${path})`;
-    },
-  );
-
-  // Replace source references like Sources: [file.py:10-20]() or fix incomplete ones in Sources: lines
-  processed = processed.replace(
-    /Sources:([^\n]+)/g,
-    (_match, sourcesContent) => {
-      // Process each citation in the Sources line
-      const processedSources = sourcesContent.replace(
-        /\[([^\]]+):(\d+)(?:-(\d+))?\]\(([^)]*)\)/g,
-        (citationMatch: string, file: string, startLine: string, endLine: string | undefined, existingUrl: string) => {
-          // If URL already exists and is not empty, keep it
-          if (existingUrl && existingUrl.trim() !== "") {
-            return citationMatch;
-          }
-          // Otherwise, generate the GitHub URL
-          const lineRef = endLine
-            ? `L${startLine}-L${endLine}`
-            : `L${startLine}`;
-          return `[${file}:${startLine}${
-            endLine ? `-${endLine}` : ""
-          }](${baseUrl}/${file}#${lineRef})`;
-        },
-      );
-      return `Sources:${processedSources}`;
-    },
-  );
-
-  return processed;
 }
 
 if (import.meta.main) {

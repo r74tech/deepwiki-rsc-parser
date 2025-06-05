@@ -4,6 +4,8 @@
  * A TypeScript/Deno library for parsing React Server Components responses from DeepWiki
  */
 
+import { addGitHubLinks, formatPageForDisplay } from "./utils.ts";
+
 export interface PageInfo {
   id: string;
   title: string;
@@ -59,9 +61,9 @@ export class DeepWikiRSCParser {
     // Pattern 3: hex:I[ (I-type entries)
     // These can appear anywhere in a line
     const embeddedPatterns = [
-      /([0-9a-f]{1,2}):T([0-9a-f]{1,4}),/g,  // T-type
-      /([0-9a-f]{1,2}):\[/g,                 // Array type
-      /([0-9a-f]{1,2}):I\[/g,                // I-type
+      /([0-9a-f]{1,2}):T([0-9a-f]{1,4}),/g, // T-type
+      /([0-9a-f]{1,2}):\[/g, // Array type
+      /([0-9a-f]{1,2}):I\[/g, // I-type
     ];
 
     let processedContent = rscContent;
@@ -158,9 +160,9 @@ export class DeepWikiRSCParser {
       // For T-type entries, stop at the first occurrence of RSC metadata patterns
       // This prevents RSC response data from being included in markdown content
       const rscPatterns = [
-        /\d+:\["\$","\$L\d+"/,  // RSC array pattern
-        /\{"repoName":/,           // Wiki metadata pattern
-        /\{"parallelRouterKey":/,  // Next.js router pattern
+        /\d+:\["\$","\$L\d+"/, // RSC array pattern
+        /\{"repoName":/, // Wiki metadata pattern
+        /\{"parallelRouterKey":/, // Next.js router pattern
       ];
 
       for (const pattern of rscPatterns) {
@@ -287,12 +289,15 @@ export class DeepWikiRSCParser {
         .map((page) => {
           const content = this.markdownContents.get(page.contentRef);
           if (content) {
-            const separator = "=".repeat(60);
             // Add GitHub links to content if metadata is available
             const processedContent = this.metadata
-              ? this.addGitHubLinks(content)
+              ? addGitHubLinks(content, this.metadata)
               : content;
-            return `${separator}\n${page.id}: ${page.title}\n${separator}\n${processedContent}`;
+            return formatPageForDisplay({
+              id: page.id,
+              title: page.title,
+              content: processedContent,
+            });
           }
           return null;
         })
@@ -303,53 +308,5 @@ export class DeepWikiRSCParser {
     }
 
     return Array.from(this.markdownContents.values()).join("\n\n---\n\n");
-  }
-
-  /**
-   * Add GitHub links to markdown content
-   */
-  private addGitHubLinks(content: string): string {
-    if (!this.metadata) return content;
-
-    const { repo_name, commit_hash } = this.metadata;
-    const baseUrl = `https://github.com/${repo_name}/blob/${commit_hash}`;
-
-    // Replace file references like [Makefile](Makefile) with GitHub links
-    let processed = content.replace(
-      /\[([^\]]+)\]\((?!https?:\/\/)([^)]+)\)/g,
-      (match, text, path) => {
-        // Skip if it's already a full URL or an anchor link
-        if (path.startsWith("#") || path.startsWith("http")) {
-          return match;
-        }
-        return `[${text}](${baseUrl}/${path})`;
-      },
-    );
-
-    // Replace source references like Sources: [file.py:10-20]() or fix incomplete ones in Sources: lines
-    processed = processed.replace(
-      /Sources:([^\n]+)/g,
-      (_match, sourcesContent) => {
-        // Process each citation in the Sources line
-        const processedSources = sourcesContent.replace(
-          /\[([^\]]+):(\d+)(?:-(\d+))?\]\(([^)]*)\)/g,
-          (citationMatch: string, file: string, startLine: string, endLine: string, existingUrl: string) => {
-            // If URL already exists and is not empty, keep it
-            if (existingUrl && existingUrl.trim() !== "") {
-              return citationMatch;
-            }
-            // Otherwise, generate the GitHub URL
-            const lineRef = endLine
-              ? `L${startLine}-L${endLine}`
-              : `L${startLine}`;
-            return `[${file}:${startLine}${endLine ? `-${endLine}` : ""
-              }](${baseUrl}/${file}#${lineRef})`;
-          },
-        );
-        return `Sources:${processedSources}`;
-      },
-    );
-
-    return processed;
   }
 }

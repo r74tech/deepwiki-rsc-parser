@@ -4,7 +4,7 @@
 
 import { DeepWikiRSCParser } from "./parser.ts";
 import { DeepWikiClient } from "./client.ts";
-import type { ParseResult, WikiMetadata } from "./parser.ts";
+import type { PageInfo, ParseResult, WikiMetadata } from "./parser.ts";
 
 /**
  * Parse RSC response string directly
@@ -61,10 +61,7 @@ export function convertToMarkdownDocument(
   let header = "# DeepWiki Documentation";
 
   if (meta) {
-    header += `\n\n**Repository:** ${meta.repo_name}`;
-    header += `\n**Commit:** ${meta.commit_hash}`;
-    header += `\n**Generated:** ${new Date(meta.generated_at).toLocaleString()
-      }`;
+    header += `\n\n${formatMetadataForMarkdown(meta)}`;
   }
 
   // Create table of contents
@@ -101,13 +98,7 @@ export async function downloadAllDocs(
 
   // Save each page as a separate file
   for (const page of result.pages) {
-    const filename = `${page.id}-${page.title
-      .toLowerCase()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9-]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "")
-      }.md`;
+    const filename = generateOutputFilename(page);
     const filepath = `${outputDir}/${filename}`;
 
     await Deno.writeTextFile(filepath, page.content);
@@ -118,4 +109,110 @@ export async function downloadAllDocs(
   const combinedPath = `${outputDir}/_combined.md`;
   await Deno.writeTextFile(combinedPath, convertToMarkdownDocument(result));
   console.log(`Saved combined document: ${combinedPath}`);
+}
+
+/**
+ * Sanitize a string to be used as a filename
+ */
+export function sanitizeFilename(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-zA-Z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * Add GitHub links to markdown content
+ */
+export function addGitHubLinks(
+  content: string,
+  metadata: WikiMetadata,
+): string {
+  const { repo_name, commit_hash } = metadata;
+  const baseUrl = `https://github.com/${repo_name}/blob/${commit_hash}`;
+
+  // Replace file references like [Makefile](Makefile) with GitHub links
+  let processed = content.replace(
+    /\[([^\]]+)\]\((?!https?:\/\/)([^)]+)\)/g,
+    (match, text, path) => {
+      // Skip if it's already a full URL or an anchor link
+      if (path.startsWith("#") || path.startsWith("http")) {
+        return match;
+      }
+      return `[${text}](${baseUrl}/${path})`;
+    },
+  );
+
+  // Replace source references like Sources: [file.py:10-20]() or fix incomplete ones in Sources: lines
+  processed = processed.replace(
+    /Sources:([^\n]+)/g,
+    (_match, sourcesContent) => {
+      // Process each citation in the Sources line
+      const processedSources = sourcesContent.replace(
+        /\[([^\]]+):(\d+)(?:-(\d+))?\]\(([^)]*)\)/g,
+        (
+          citationMatch: string,
+          file: string,
+          startLine: string,
+          endLine: string | undefined,
+          existingUrl: string,
+        ) => {
+          // If URL already exists and is not empty, keep it
+          if (existingUrl && existingUrl.trim() !== "") {
+            return citationMatch;
+          }
+          // Otherwise, generate the GitHub URL
+          const lineRef = endLine
+            ? `L${startLine}-L${endLine}`
+            : `L${startLine}`;
+          return `[${file}:${startLine}${
+            endLine ? `-${endLine}` : ""
+          }](${baseUrl}/${file}#${lineRef})`;
+        },
+      );
+      return `Sources:${processedSources}`;
+    },
+  );
+
+  return processed;
+}
+
+/**
+ * Format a wiki page for console display
+ */
+export function formatPageForDisplay(page: PageInfo): string {
+  const separator = "=".repeat(60);
+  return `${separator}\n${page.id}: ${page.title}\n${separator}\n${page.content}`;
+}
+
+/**
+ * Format metadata for console display
+ */
+export function formatMetadataForConsole(metadata: WikiMetadata): string {
+  return [
+    "\nMetadata:",
+    `- Repository: ${metadata.repo_name}`,
+    `- Commit: ${metadata.commit_hash}`,
+    `- Generated: ${metadata.generated_at}`,
+  ].join("\n");
+}
+
+/**
+ * Format metadata for markdown display
+ */
+export function formatMetadataForMarkdown(metadata: WikiMetadata): string {
+  return [
+    `**Repository:** ${metadata.repo_name}`,
+    `**Commit:** ${metadata.commit_hash}`,
+    `**Generated:** ${new Date(metadata.generated_at).toLocaleString()}`,
+  ].join("\n");
+}
+
+/**
+ * Generate output filename for a wiki page
+ */
+export function generateOutputFilename(page: PageInfo): string {
+  return `${page.id}-${sanitizeFilename(page.title)}.md`;
 }
