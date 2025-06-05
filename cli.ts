@@ -92,7 +92,6 @@ async function main() {
 
   try {
     const client = new DeepWikiClient();
-    console.log(`Fetching documentation for ${org}/${repo}...`);
 
     let result: ParseResult;
     let metadata: WikiMetadata | undefined;
@@ -130,13 +129,14 @@ async function main() {
         }
 
         for (const page of result.pages) {
-          const filename = `${page.id}-${page.title
-            .toLowerCase()
-            .replace(/\s+/g, "-")
-            .replace(/[^a-zA-Z0-9-]/g, "-")
-            .replace(/-+/g, "-")
-            .replace(/^-|-$/g, "")
-            }.md`;
+          const filename = `${page.id}-${
+            page.title
+              .toLowerCase()
+              .replace(/\s+/g, "-")
+              .replace(/[^a-zA-Z0-9-]/g, "-")
+              .replace(/-+/g, "-")
+              .replace(/^-|-$/g, "")
+          }.md`;
           const filepath = `${options.output}/${filename}`;
 
           // Add GitHub links to content if metadata is available
@@ -196,7 +196,7 @@ function addGitHubLinks(content: string, metadata: WikiMetadata): string {
   // Replace source references like Sources: [file.py:10-20]() or fix incomplete ones in Sources: lines
   processed = processed.replace(
     /Sources:([^\n]+)/g,
-    (match, sourcesContent) => {
+    (_match, sourcesContent) => {
       // Process each citation in the Sources line
       const processedSources = sourcesContent.replace(
         /\[([^\]]+):(\d+)(?:-(\d+))?\]\(([^)]*)\)/g,
@@ -209,8 +209,9 @@ function addGitHubLinks(content: string, metadata: WikiMetadata): string {
           const lineRef = endLine
             ? `L${startLine}-L${endLine}`
             : `L${startLine}`;
-          return `[${file}:${startLine}${endLine ? `-${endLine}` : ""
-            }](${baseUrl}/${file}#${lineRef})`;
+          return `[${file}:${startLine}${
+            endLine ? `-${endLine}` : ""
+          }](${baseUrl}/${file}#${lineRef})`;
         },
       );
       return `Sources:${processedSources}`;

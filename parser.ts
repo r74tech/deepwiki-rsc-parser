@@ -53,16 +53,27 @@ export class DeepWikiRSCParser {
   parse(rscContent: string): ParseResult {
     this.reset();
 
-    // Pre-process to extract embedded T-type entries
-    // Pattern: digits:Thex, (can appear anywhere in line)
-    const embeddedPattern = /([0-9a-f]{1,2}):T([0-9a-f]{1,4}),/g;
-    const processedContent = rscContent.replace(
-      embeddedPattern,
-      (match, id, hash) => {
-        // Add newline before embedded entries to separate them
-        return `\n${match}`;
-      },
-    );
+    // Pre-process to extract embedded entries
+    // Pattern 1: hex:Thex, (T-type entries)
+    // Pattern 2: hex:[ (array entries)
+    // Pattern 3: hex:I[ (I-type entries)
+    // These can appear anywhere in a line
+    const embeddedPatterns = [
+      /([0-9a-f]{1,2}):T([0-9a-f]{1,4}),/g,  // T-type
+      /([0-9a-f]{1,2}):\[/g,                 // Array type
+      /([0-9a-f]{1,2}):I\[/g,                // I-type
+    ];
+
+    let processedContent = rscContent;
+    for (const pattern of embeddedPatterns) {
+      processedContent = processedContent.replace(
+        pattern,
+        (match) => {
+          // Add newline before embedded entries to separate them
+          return `\n${match}`;
+        },
+      );
+    }
 
     const lines = processedContent.split("\n");
     let currentEntry: RSCEntry | null = null;
@@ -141,9 +152,26 @@ export class DeepWikiRSCParser {
   }
 
   private saveEntry(entry: RSCEntry, contentBuffer: string[]): void {
-    const fullContent = contentBuffer.join("\n").trim();
+    let fullContent = contentBuffer.join("\n").trim();
 
     if (entry.type === "T") {
+      // For T-type entries, stop at the first occurrence of RSC metadata patterns
+      // This prevents RSC response data from being included in markdown content
+      const rscPatterns = [
+        /\d+:\["\$","\$L\d+"/,  // RSC array pattern
+        /\{"repoName":/,           // Wiki metadata pattern
+        /\{"parallelRouterKey":/,  // Next.js router pattern
+      ];
+
+      for (const pattern of rscPatterns) {
+        const match = fullContent.match(pattern);
+        if (match && match.index !== undefined) {
+          // Trim content before the RSC metadata
+          fullContent = fullContent.substring(0, match.index).trim();
+          break;
+        }
+      }
+
       this.markdownContents.set(entry.id, fullContent);
     }
 
@@ -155,7 +183,7 @@ export class DeepWikiRSCParser {
 
   private extractPageStructure(): void {
     // Check all entries for page structure and metadata
-    for (const [id, entry] of this.entries) {
+    for (const [_id, entry] of this.entries) {
       const content = entry.fullContent || "";
 
       if (content.includes('"wiki":{')) {
@@ -301,7 +329,7 @@ export class DeepWikiRSCParser {
     // Replace source references like Sources: [file.py:10-20]() or fix incomplete ones in Sources: lines
     processed = processed.replace(
       /Sources:([^\n]+)/g,
-      (match, sourcesContent) => {
+      (_match, sourcesContent) => {
         // Process each citation in the Sources line
         const processedSources = sourcesContent.replace(
           /\[([^\]]+):(\d+)(?:-(\d+))?\]\(([^)]*)\)/g,

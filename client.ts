@@ -24,8 +24,8 @@ export interface DeepWikiOptions {
  */
 export class DeepWikiClient {
   public parser = new DeepWikiRSCParser();
-  private baseUrl: string;
-  private defaultHeaders: Record<string, string>;
+  public baseUrl: string;
+  public defaultHeaders: Record<string, string>;
   private rscIdCache = new Map<string, string>();
 
   constructor(options: DeepWikiOptions = {}) {
@@ -40,7 +40,7 @@ export class DeepWikiClient {
   /**
    * Get RSC ID from initial page load
    */
-  private async getRscId(org: string, repo: string): Promise<string> {
+  private getRscId(org: string, repo: string): string {
     const cacheKey = `${org}/${repo}`;
 
     // Check cache first
@@ -58,7 +58,7 @@ export class DeepWikiClient {
    * Fetch wiki documentation for a repository
    */
   async fetchWiki(org: string, repo: string): Promise<ParseResult> {
-    const rscId = await this.getRscId(org, repo);
+    const rscId = this.getRscId(org, repo);
     const url = rscId
       ? `${this.baseUrl}/${org}/${repo}?_rsc=${rscId}`
       : `${this.baseUrl}/${org}/${repo}`;
@@ -80,7 +80,7 @@ export class DeepWikiClient {
     repo: string,
     pageId: string,
   ): Promise<ParseResult> {
-    const rscId = await this.getRscId(org, repo);
+    const rscId = this.getRscId(org, repo);
     const url = `${this.baseUrl}/${org}/${repo}/${pageId}?_rsc=${rscId}`;
 
     const response = await this.fetchRSC(url, {
@@ -196,13 +196,13 @@ export class DeepWikiClient {
    * Get markdown content for all pages
    */
   async getAllMarkdown(org: string, repo: string): Promise<string> {
-    const result = await this.fetchWiki(org, repo);
+    const _result = await this.fetchWiki(org, repo);
     const parser = new DeepWikiRSCParser();
 
     // Re-parse to ensure we have the parser instance
-    const parsed = parser.parse(
+    const _parsed = parser.parse(
       await this.fetchRSC(
-        `${this.baseUrl}/${org}/${repo}?_rsc=${await this.getRscId(org, repo)}`,
+        `${this.baseUrl}/${org}/${repo}?_rsc=${this.getRscId(org, repo)}`,
         { org, repo, wikiRoutes: [""] },
       ),
     );
@@ -235,7 +235,7 @@ export class DeepWikiClient {
     // Replace source references like Sources: [file.py:10-20]()
     processed = processed.replace(
       /Sources:\s*\[([^\]]+):(\d+)(?:-(\d+))?\]\(\)/g,
-      (match, file, startLine, endLine) => {
+      (_match, file, startLine, endLine) => {
         const lineRef = endLine ? `L${startLine}-L${endLine}` : `L${startLine}`;
         return `Sources: [${file}:${startLine}${
           endLine ? `-${endLine}` : ""
