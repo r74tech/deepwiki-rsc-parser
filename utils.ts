@@ -75,7 +75,9 @@ export function convertToMarkdownDocument(
   const content = result.pages
     .map((page) => {
       const anchorId = page.id.replace(/\./g, "");
-      return `<a id="${anchorId}"></a>\n\n## ${page.id} ${page.title}\n\n${page.content}`;
+      // Apply GitHub links if metadata is available
+      const pageContent = meta ? addGitHubLinks(page.content, meta) : page.content;
+      return `<a id="${anchorId}"></a>\n\n## ${page.id} ${page.title}\n\n${pageContent}`;
     })
     .join("\n\n---\n\n");
 
@@ -146,9 +148,10 @@ export function addGitHubLinks(
   );
 
   // Replace source references like Sources: [file.py:10-20]() or fix incomplete ones in Sources: lines
+  // Also handle **Sources**: format
   processed = processed.replace(
-    /Sources:([^\n]+)/g,
-    (_match, sourcesContent) => {
+    /(\*\*)?Sources(\*\*)?:([^\n]+)/g,
+    (_match, boldStart, boldEnd, sourcesContent) => {
       // Process each citation in the Sources line
       const processedSources = sourcesContent.replace(
         /\[([^\]]+):(\d+)(?:-(\d+))?\]\(([^)]*)\)/g,
@@ -172,7 +175,10 @@ export function addGitHubLinks(
           }](${baseUrl}/${file}#${lineRef})`;
         },
       );
-      return `Sources:${processedSources}`;
+      // Preserve the original formatting (bold or not)
+      const prefix = boldStart || "";
+      const suffix = boldEnd || "";
+      return `${prefix}Sources${suffix}:${processedSources}`;
     },
   );
 
