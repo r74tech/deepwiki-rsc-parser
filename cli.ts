@@ -169,7 +169,7 @@ async function main() {
       }
     }
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("Error:", error instanceof Error ? error.message : String(error));
     Deno.exit(1);
   }
 }
@@ -200,7 +200,7 @@ function addGitHubLinks(content: string, metadata: WikiMetadata): string {
       // Process each citation in the Sources line
       const processedSources = sourcesContent.replace(
         /\[([^\]]+):(\d+)(?:-(\d+))?\]\(([^)]*)\)/g,
-        (citationMatch, file, startLine, endLine, existingUrl) => {
+        (citationMatch: string, file: string, startLine: string, endLine: string | undefined, existingUrl: string) => {
           // If URL already exists and is not empty, keep it
           if (existingUrl && existingUrl.trim() !== "") {
             return citationMatch;
