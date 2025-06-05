@@ -1,0 +1,24 @@
+{
+  "name": "@r74tech/deepwiki-rsc-parser",
+  "version": "0.1.0",
+  "tasks": {
+    "dev": "deno run --watch --allow-net mod.ts",
+    "test": "deno test --allow-net",
+    "build": "deno run --allow-read --allow-write --allow-net --allow-env --allow-run ./build_npm.ts",
+    "fmt": "deno fmt",
+    "lint": "deno lint"
+  },
+  "exports": "./mod.ts",
+  "fmt": {
+    "indentWidth": 2,
+    "semiColons": true,
+    "singleQuote": false
+  },
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    }
+  }
+}
